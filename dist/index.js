@@ -29328,7 +29328,8 @@ async function runAgy(args, opts) {
     const stderrChunks = [];
     let totalBytes = 0;
     let capped = false;
-    async function readStream(stream, chunks) {
+    const decoder = new TextDecoder;
+    async function readStream(stream, chunks, isStdout) {
       const reader = stream.getReader();
       while (true) {
         const { done, value } = await reader.read();
@@ -29338,10 +29339,18 @@ async function runAgy(args, opts) {
           if (!capped && totalBytes + value.byteLength <= maxBytes) {
             chunks.push(value);
             totalBytes += value.byteLength;
+            if (isStdout && opts.onChunk) {
+              const text = decoder.decode(value, { stream: true });
+              opts.onChunk(text);
+            }
           } else if (!capped) {
             const remaining = maxBytes - totalBytes;
             if (remaining > 0) {
-              chunks.push(value.slice(0, remaining));
+              const slice = value.slice(0, remaining);
+              chunks.push(slice);
+              if (isStdout && opts.onChunk) {
+                opts.onChunk(decoder.decode(slice, { stream: true }));
+              }
             }
             capped = true;
             try {
@@ -29352,15 +29361,14 @@ async function runAgy(args, opts) {
       }
     }
     await Promise.all([
-      readStream(proc.stdout, stdoutChunks),
-      readStream(proc.stderr, stderrChunks)
+      readStream(proc.stdout, stdoutChunks, true),
+      readStream(proc.stderr, stderrChunks, false)
     ]);
     const exitCode = await proc.exited;
     if (timeoutHandle !== null)
       clearTimeout(timeoutHandle);
     if (killHandle !== null)
       clearTimeout(killHandle);
-    const decoder = new TextDecoder;
     const stdoutBuf = new Uint8Array(stdoutChunks.reduce((acc, c) => acc + c.byteLength, 0));
     let offset = 0;
     for (const chunk of stdoutChunks) {
@@ -29421,6 +29429,27 @@ async function pingHandler(config2) {
   }
 }
 
+// src/tools/progress.ts
+function makeProgressEmitter(progressToken, sendNotification) {
+  if (progressToken === undefined) {
+    return null;
+  }
+  let progress = 0;
+  return async function emitChunk(chunk) {
+    progress++;
+    try {
+      await sendNotification({
+        method: "notifications/progress",
+        params: {
+          progressToken,
+          progress,
+          message: chunk
+        }
+      });
+    } catch {}
+  };
+}
+
 // src/tools/ask.ts
 function buildAgyArgs(prompt, opts) {
   const args = ["--print", prompt];
@@ -29438,15 +29467,24 @@ function buildAgyArgs(prompt, opts) {
   }
   return args;
 }
-async function askHandler(input, config2) {
+async function askHandler(input, config2, extra) {
   const args = buildAgyArgs(input.prompt, input);
   const timeoutMs = input.timeout_ms ?? config2.timeoutMs;
+  const progressToken = extra?._meta?.progressToken;
+  const progressEmitter = extra ? makeProgressEmitter(progressToken, (n) => extra.sendNotification(n)) : null;
+  function onChunk(chunk) {
+    console.error(`[agy] ${chunk.trimEnd()}`);
+    if (progressEmitter) {
+      progressEmitter(chunk).catch(() => {});
+    }
+  }
   try {
     const result = await runAgy(args, {
       agyCmdPath: config2.agyCmdPath,
       cwd: input.cwd ?? config2.workspaceRoot,
       timeoutMs,
-      maxConcurrent: config2.maxConcurrent
+      maxConcurrent: config2.maxConcurrent,
+      onChunk
     });
     return mcpText(result.stdout);
   } catch (e) {
@@ -29459,31 +29497,47 @@ async function askHandler(input, config2) {
 }
 
 // src/tools/search.ts
-async function searchHandler(input, config2) {
+async function searchHandler(input, config2, extra) {
   const prompt = `Search the web for: ${input.query}`;
   return askHandler({ prompt }, {
     agyCmdPath: config2.agyCmdPath,
     timeoutMs: config2.searchTimeoutMs,
     workspaceRoot: config2.workspaceRoot,
     maxConcurrent: config2.maxConcurrent
-  });
+  }, extra);
 }
 
 // src/tools/write.ts
 import { mkdir, access } from "fs/promises";
-import { dirname } from "path";
+import { dirname as dirname2 } from "path";
 
 // src/security.ts
 import { realpath } from "fs/promises";
-import { resolve } from "path";
+import { resolve, dirname } from "path";
 async function validatePath(inputPath, workspaceRoot) {
   const realRoot = await realpath(workspaceRoot);
   const abs = resolve(realRoot, inputPath);
-  const real = await realpath(abs).catch(() => abs);
-  if (!real.startsWith(realRoot + "/") && real !== realRoot) {
-    throw new AgyPathError(`Path escapes workspace: ${inputPath}`);
+  let current = abs;
+  while (true) {
+    try {
+      const real = await realpath(current);
+      if (!real.startsWith(realRoot + "/") && real !== realRoot) {
+        throw new AgyPathError(`Path escapes workspace: ${inputPath}`);
+      }
+      break;
+    } catch (e) {
+      if (e.code === "ENOENT") {
+        const parent = dirname(current);
+        if (parent === current) {
+          throw new AgyPathError(`Path escapes workspace: ${inputPath}`);
+        }
+        current = parent;
+      } else {
+        throw e;
+      }
+    }
   }
-  return real;
+  return realpath(abs).catch(() => abs);
 }
 
 // src/tools/write.ts
@@ -29498,7 +29552,7 @@ async function writeHandler(input, workspaceRoot) {
     const message = e instanceof Error ? e.message : String(e);
     return mcpError(message);
   }
-  const parentDir = dirname(resolvedPath);
+  const parentDir = dirname2(resolvedPath);
   if (input.create_parents) {
     await mkdir(parentDir, { recursive: true });
   } else {
@@ -29539,24 +29593,24 @@ server.registerTool("ask-agy", {
     add_dirs: exports_external.array(exports_external.string()).max(10).optional().describe("Extra directories to add"),
     skip_permissions: exports_external.boolean().optional().describe("Skip agy permission prompts")
   }
-}, (input) => askHandler({
+}, (input, extra) => askHandler({
   prompt: input.prompt,
   cwd: input.cwd,
   timeout_ms: input.timeout_ms,
   add_dirs: input.add_dirs,
   skip_permissions: input.skip_permissions
-}, askConfig));
+}, askConfig, extra));
 server.registerTool("search-web", {
   description: "Search the web via agy. Results come from agy's AI + web access \u2014 not a deterministic search API.",
   inputSchema: {
     query: exports_external.string().max(500).describe("The search query")
   }
-}, (input) => searchHandler({ query: input.query }, {
+}, (input, extra) => searchHandler({ query: input.query }, {
   agyCmdPath: AGY_PATH,
   searchTimeoutMs: AGY_SEARCH_TIMEOUT_MS,
   workspaceRoot: AGY_WORKSPACE_ROOT,
   maxConcurrent: AGY_MAX_CONCURRENT
-}));
+}, extra));
 server.registerTool("write-file", {
   description: "Write exact content to a file within the workspace. Path must be relative or within the workspace root.",
   inputSchema: {
