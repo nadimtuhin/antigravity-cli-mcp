@@ -1,17 +1,47 @@
 {
   "name": "antigravity-cli-mcp",
   "version": "1.0.0",
+  "description": "MCP server wrapping the agy (antigravity) CLI — exposes ping, ask-agy, search-web, and write-file tools to any MCP client",
   "type": "module",
   "bin": {
-    "antigravity-cli-mcp": "./dist/index.js"
+    "antigravity-cli-mcp": "dist/index.js"
   },
+  "files": [
+    "dist/index.js",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "bun run --watch src/index.ts",
     "build": "bun build src/index.ts --target bun --outfile dist/index.js",
     "start": "bun run dist/index.js",
     "test": "bun test",
     "test:watch": "bun test --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "antigravity",
+    "agy",
+    "claude",
+    "llm",
+    "ai",
+    "cli"
+  ],
+  "author": "Nadim Tuhin <nadimtuhin@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nadimtuhin/antigravity-cli-mcp.git"
+  },
+  "homepage": "https://github.com/nadimtuhin/antigravity-cli-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/nadimtuhin/antigravity-cli-mcp/issues"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
