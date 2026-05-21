@@ -1,23 +1,23 @@
-# Dependency directories
+# Dependencies
 node_modules/
 
 # Build outputs
 dist/
-dist/*
-!dist/index.js
-*.tgz
 
-# Local environment/config files
+# Environment variables
 .env
 .env.*
-.npmrc.publish
-*.log
+!.env.example
+
+# OS artifacts
 .DS_Store
+Thumbs.db
 
-# Tool/editor specifics
-.omc/
-.antigravitycli/
-.claude/
-.kiro/
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Tool-specific
 .code-review-graph/
-
+.omc/

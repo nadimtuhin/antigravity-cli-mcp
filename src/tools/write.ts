@@ -1,1 +1,1 @@
-export { writeHandler, type WriteInput } from "mcp-cli-core";
+export { writeHandler } from "mcp-cli-core";

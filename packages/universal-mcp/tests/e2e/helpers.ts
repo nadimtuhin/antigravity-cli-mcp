@@ -3,7 +3,7 @@ import type { Subprocess } from "bun";
 const SERVER_ENTRY = import.meta.dir + "/../../src/index.ts";
 const F = import.meta.dir + "/../../test-fixtures";
 
-export const FAKE_PATHS = {
+const FAKE_PATHS = {
   AGY_PATH: `${F}/fake-agy.sh`,
   KILO_PATH: `${F}/fake-kilo.sh`,
   OPENCODE_PATH: `${F}/fake-opencode.sh`,
@@ -49,7 +49,7 @@ export async function sendJsonRpc(
   return readResponse(proc, id, timeoutMs);
 }
 
-export async function sendNotification(
+async function sendNotification(
   proc: Subprocess<"pipe", "pipe", "pipe">,
   method: string,
   params: Record<string, unknown> = {}

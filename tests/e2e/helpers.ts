@@ -28,7 +28,7 @@ export async function sendJsonRpc(
   return readJsonRpcResponse(proc, id, timeoutMs);
 }
 
-export async function sendNotification(
+async function sendNotification(
   proc: Subprocess<"pipe", "pipe", "pipe">,
   method: string,
   params: Record<string, unknown> = {}
