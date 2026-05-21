@@ -1,2 +1,23 @@
-# Added by code-review-graph
+# Dependency directories
+node_modules/
+
+# Build outputs
+dist/
+dist/*
+!dist/index.js
+*.tgz
+
+# Local environment/config files
+.env
+.env.*
+.npmrc.publish
+*.log
+.DS_Store
+
+# Tool/editor specifics
+.omc/
+.antigravitycli/
+.claude/
+.kiro/
 .code-review-graph/
+
