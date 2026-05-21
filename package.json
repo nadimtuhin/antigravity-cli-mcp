@@ -1,0 +1,24 @@
+{
+  "name": "antigravity-cli-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "antigravity-cli-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --target bun --outfile dist/index.js",
+    "start": "bun run dist/index.js",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^6.0.3"
+  }
+}
