@@ -134,7 +134,7 @@ export async function runCli(args: string[], opts: RunCliOpts): Promise<RunCliRe
       console.error(`${prefix} [stderr] ${stderr.slice(0, 200)}`);
     }
 
-    if (exitCode !== 0) {
+    if (exitCode !== 0 && !capped) {
       throw new CliExitError(`CLI exited with code ${exitCode}`, exitCode, stdout, stderr);
     }
 

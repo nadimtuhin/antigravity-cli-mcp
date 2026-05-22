@@ -57,5 +57,14 @@ describe("runCli", () => {
       maxOutputBytes: 100,
     });
     expect(result.stdout.length).toBeLessThanOrEqual(100);
+    expect(result.timedOut).toBe(false);
+  }, 10_000);
+
+  test("maxOutputBytes: does not throw CliExitError when process killed by cap", async () => {
+    // Previously this was flaky: when SIGTERM arrived before process exited,
+    // non-zero exit code caused CliExitError to be thrown instead of returning.
+    await expect(
+      runCli(["-c", "yes"], { cliCmdPath: "/bin/sh", maxOutputBytes: 50 })
+    ).resolves.toMatchObject({ stdout: expect.any(String) });
   }, 10_000);
 });
