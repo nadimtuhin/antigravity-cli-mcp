@@ -131,4 +131,48 @@ describe("e2e: MCP server", () => {
       try { rmSync(ws, { recursive: true }); } catch {}
     }
   }, 15_000);
+
+  test("ask-agy passes add_dirs as --add-dir flags", async () => {
+    server = startServer();
+    await initializeMcp(server);
+
+    const response = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-agy", arguments: { prompt: "hello", add_dirs: ["/extra/dir"] } },
+    });
+
+    expect(response.error).toBeUndefined();
+    const result = response.result as { content: Array<{ type: string; text: string }> };
+    expect(result.content[0].text).toContain("--add-dir");
+    expect(result.content[0].text).toContain("/extra/dir");
+  }, 15_000);
+
+  test("ask-agy passes cwd as --add-dir flag", async () => {
+    server = startServer();
+    await initializeMcp(server);
+
+    const response = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-agy", arguments: { prompt: "hello", cwd: "/tmp" } },
+    });
+
+    expect(response.error).toBeUndefined();
+    const result = response.result as { content: Array<{ type: string; text: string }> };
+    expect(result.content[0].text).toContain("--add-dir");
+    expect(result.content[0].text).toContain("/tmp");
+  }, 15_000);
+
+  test("ask-agy passes skip_permissions as --dangerously-skip-permissions", async () => {
+    server = startServer();
+    await initializeMcp(server);
+
+    const response = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-agy", arguments: { prompt: "hello", skip_permissions: true } },
+    });
+
+    expect(response.error).toBeUndefined();
+    const result = response.result as { content: Array<{ type: string; text: string }> };
+    expect(result.content[0].text).toContain("--dangerously-skip-permissions");
+  }, 15_000);
 });

@@ -5,6 +5,7 @@ if [[ "$1" == "version" ]]; then
 fi
 if [[ "$1" == "chat" && "$2" == "-q" ]]; then
   echo "Hello from fake hermes: $3"
+  echo "args: $*"
   exit 0
 fi
 if [[ "$1" == "insights" ]]; then

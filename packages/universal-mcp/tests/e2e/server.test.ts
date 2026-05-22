@@ -261,6 +261,45 @@ describe("e2e: universal MCP server", () => {
     expect(out).toContain("--add-dir");
     expect(out).toContain("/extra");
   }, 15_000);
+
+  test("ask-opencode passes model as --model flag", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-opencode", arguments: { prompt: "hello", model: "gpt-4o" } },
+    });
+    expect(resp.error).toBeUndefined();
+    const out = toolText(resp);
+    expect(out).toContain("--model");
+    expect(out).toContain("gpt-4o");
+  }, 15_000);
+
+  test("ask-hermes passes model as --model flag", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-hermes", arguments: { prompt: "hello", model: "MiniMax" } },
+    });
+    expect(resp.error).toBeUndefined();
+    const out = toolText(resp);
+    expect(out).toContain("--model");
+    expect(out).toContain("MiniMax");
+  }, 15_000);
+
+  test("ask-hermes passes max_turns as --max-turns flag", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-hermes", arguments: { prompt: "hello", max_turns: 3 } },
+    });
+    expect(resp.error).toBeUndefined();
+    const out = toolText(resp);
+    expect(out).toContain("--max-turns");
+    expect(out).toContain("3");
+  }, 15_000);
   test("get-result unknown job → not found message", async () => {
     server = startServer();
     await initializeMcp(server);
