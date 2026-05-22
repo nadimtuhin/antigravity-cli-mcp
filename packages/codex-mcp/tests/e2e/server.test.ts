@@ -82,4 +82,18 @@ describe("e2e: codex-cli-mcp server", () => {
     expect(out).toContain("-c");
     expect(out).toContain('model="o3"');
   }, 15_000);
+
+  test("write-file path traversal → isError", async () => {
+    const tmpDir = `/tmp/codex-mcp-traversal-${Date.now()}`;
+    await Bun.write(`${tmpDir}/.keep`, "");
+    server = startServer({ CODEX_WORKSPACE_ROOT: tmpDir });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "write-file", arguments: { path: "../../etc/passwd", content: "x", create_parents: false } },
+    });
+    const result = resp.result as { isError: boolean; content: Array<{ text: string }> };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("escapes workspace");
+  }, 15_000);
 });
