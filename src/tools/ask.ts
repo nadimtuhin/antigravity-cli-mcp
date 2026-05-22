@@ -26,10 +26,12 @@ export function buildAgyArgs(prompt: string, opts: Partial<AskInput>): string[] 
     const seconds = Math.floor(opts.timeout_ms / 1000);
     args.push("--print-timeout", `${seconds}s`);
   }
-  if (opts.add_dirs) {
-    for (const dir of opts.add_dirs) {
-      args.push("--add-dir", dir);
-    }
+  const extraDirs: string[] = [];
+  if (opts.cwd && !opts.add_dirs?.includes(opts.cwd)) {
+    extraDirs.push(opts.cwd);
+  }
+  for (const dir of [...extraDirs, ...(opts.add_dirs ?? [])]) {
+    args.push("--add-dir", dir);
   }
   if (opts.skip_permissions === true) {
     args.push("--dangerously-skip-permissions");

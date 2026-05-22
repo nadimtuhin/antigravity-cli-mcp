@@ -40,6 +40,24 @@ describe("buildAgyArgs", () => {
     const args = buildAgyArgs("hello", { skip_permissions: false });
     expect(args).not.toContain("--dangerously-skip-permissions");
   });
+
+  test("auto-adds cwd as --add-dir", () => {
+    const args = buildAgyArgs("hello", { cwd: "/my/project" });
+    expect(args).toContain("--add-dir");
+    expect(args).toContain("/my/project");
+  });
+
+  test("no duplicate --add-dir when cwd already in add_dirs", () => {
+    const args = buildAgyArgs("hello", { cwd: "/p", add_dirs: ["/p"] });
+    const count = args.filter((a) => a === "/p").length;
+    expect(count).toBe(1);
+  });
+
+  test("add_dirs without cwd: no extra --add-dir injected", () => {
+    const args = buildAgyArgs("hello", { add_dirs: ["/other"] });
+    expect(args.filter((a) => a === "--add-dir").length).toBe(1);
+    expect(args).toContain("/other");
+  });
 });
 
 describe("askHandler", () => {
