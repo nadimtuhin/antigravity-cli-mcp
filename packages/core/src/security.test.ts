@@ -31,4 +31,18 @@ describe("validatePath", () => {
       validatePath("/etc/passwd", ROOT)
     ).rejects.toBeInstanceOf(CliPathError);
   }, 10_000);
+
+  test("absolute path inside workspace → returns resolved path", async () => {
+    const result = await validatePath(`${ROOT}/file.txt`, ROOT);
+    expect(result).toBe(`${ROOT}/file.txt`);
+  }, 10_000);
+
+  test("symlink inside workspace pointing outside → throws CliPathError", async () => {
+    const { symlink } = await import("fs/promises");
+    const linkPath = `${ROOT}/evil-link`;
+    await symlink("/etc/passwd", linkPath).catch(() => {});
+    await expect(
+      validatePath("evil-link", ROOT)
+    ).rejects.toBeInstanceOf(CliPathError);
+  }, 10_000);
 });

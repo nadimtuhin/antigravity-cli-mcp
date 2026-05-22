@@ -50,4 +50,12 @@ describe("runCli", () => {
     });
     expect(chunks.join("")).toContain("hello");
   }, 10_000);
+
+  test("maxOutputBytes: output capped and process killed", async () => {
+    const result = await runCli(["-c", "printf '%0.s1234567890' {1..200}"], {
+      cliCmdPath: "/bin/sh",
+      maxOutputBytes: 100,
+    });
+    expect(result.stdout.length).toBeLessThanOrEqual(100);
+  }, 10_000);
 });
