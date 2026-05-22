@@ -103,3 +103,21 @@ describe("buildArgs — agy cwd promotion", () => {
     expect(args).not.toContain("--add-dir");
   });
 });
+
+describe("buildArgs — agy timeout and skip_permissions", () => {
+  test("via=agy with timeout_ms injects --print-timeout", () => {
+    const args = buildArgs("hello", "agy", { timeout_ms: 5000 });
+    expect(args).toContain("--print-timeout");
+    expect(args).toContain("5s");
+  });
+
+  test("via=agy with skip_permissions injects --dangerously-skip-permissions", () => {
+    const args = buildArgs("hello", "agy", { skip_permissions: true });
+    expect(args).toContain("--dangerously-skip-permissions");
+  });
+
+  test("via=kilo with skip_permissions does NOT inject --dangerously-skip-permissions", () => {
+    const args = buildArgs("hello", "kilo", { skip_permissions: true });
+    expect(args).not.toContain("--dangerously-skip-permissions");
+  });
+});

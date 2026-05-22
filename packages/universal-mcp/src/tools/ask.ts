@@ -12,6 +12,7 @@ export interface AskInput {
   timeout_ms?: number;
   model?: string;
   max_turns?: number;
+  skip_permissions?: boolean;
 }
 
 export interface AskConfig {
@@ -29,6 +30,11 @@ export function buildArgs(prompt: string, via: CliName, opts: Partial<AskInput> 
     case "agy": {
       const args = ["--print", prompt];
       if (opts.cwd) args.push("--add-dir", opts.cwd);
+      if (opts.timeout_ms) {
+        const seconds = Math.floor(opts.timeout_ms / 1000);
+        args.push("--print-timeout", `${seconds}s`);
+      }
+      if (opts.skip_permissions === true) args.push("--dangerously-skip-permissions");
       return args;
     }
     case "kilo":
