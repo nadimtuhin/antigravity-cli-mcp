@@ -26,8 +26,11 @@ export type McpExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
 
 export function buildArgs(prompt: string, via: CliName, opts: Partial<AskInput> = {}): string[] {
   switch (via) {
-    case "agy":
-      return ["--print", prompt];
+    case "agy": {
+      const args = ["--print", prompt];
+      if (opts.cwd) args.push("--add-dir", opts.cwd);
+      return args;
+    }
     case "kilo":
     case "opencode": {
       const args = ["run", prompt];

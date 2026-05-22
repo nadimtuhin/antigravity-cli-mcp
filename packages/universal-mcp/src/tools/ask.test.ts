@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { askHandler, type AskConfig, type McpExtra } from "./ask.js";
+import { askHandler, buildArgs, type AskConfig, type McpExtra } from "./ask.js";
 
 const F = import.meta.dir + "/../../test-fixtures";
 
@@ -84,4 +84,22 @@ describe("askHandler", () => {
     expect(first.method).toBe("notifications/progress");
     expect(first.params.progressToken).toBe("tok-1");
   }, 10_000);
+});
+
+describe("buildArgs — agy cwd promotion", () => {
+  test("via=agy with cwd injects --add-dir", () => {
+    const args = buildArgs("hello", "agy", { cwd: "/my/project" });
+    expect(args).toContain("--add-dir");
+    expect(args).toContain("/my/project");
+  });
+
+  test("via=kilo with cwd does NOT inject --add-dir", () => {
+    const args = buildArgs("hello", "kilo", { cwd: "/my/project" });
+    expect(args).not.toContain("--add-dir");
+  });
+
+  test("via=agy without cwd: no --add-dir", () => {
+    const args = buildArgs("hello", "agy", {});
+    expect(args).not.toContain("--add-dir");
+  });
 });
