@@ -30,7 +30,7 @@ export function buildAgyArgs(prompt: string, opts: Partial<AskInput>): string[] 
   if (opts.cwd && !opts.add_dirs?.includes(opts.cwd)) {
     extraDirs.push(opts.cwd);
   }
-  for (const dir of [...extraDirs, ...(opts.add_dirs ?? [])]) {
+  for (const dir of [...new Set([...extraDirs, ...(opts.add_dirs ?? [])])]) {
     args.push("--add-dir", dir);
   }
   if (opts.skip_permissions === true) {

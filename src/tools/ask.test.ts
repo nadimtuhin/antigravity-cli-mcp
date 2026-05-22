@@ -58,6 +58,12 @@ describe("buildAgyArgs", () => {
     expect(args.filter((a) => a === "--add-dir").length).toBe(1);
     expect(args).toContain("/other");
   });
+
+  test("deduplicates duplicate entries in add_dirs", () => {
+    const args = buildAgyArgs("hello", { add_dirs: ["/a", "/a"] });
+    const count = args.filter((a) => a === "/a").length;
+    expect(count).toBe(1);
+  });
 });
 
 describe("askHandler", () => {
