@@ -31,6 +31,12 @@ describe("e2e: universal MCP server", () => {
     expect(names).toContain("ask-opencode");
     expect(names).toContain("ask-codex");
     expect(names).toContain("ask-hermes");
+    expect(names).toContain("sub-agy");
+    expect(names).toContain("sub-kilo");
+    expect(names).toContain("sub-opencode");
+    expect(names).toContain("sub-codex");
+    expect(names).toContain("sub-hermes");
+    expect(names).toContain("get-result");
     expect(names).toContain("search-web");
     expect(names).toContain("write-file");
     expect(names).toContain("get-usage");
@@ -167,5 +173,52 @@ describe("e2e: universal MCP server", () => {
       params: { name: "write-file", arguments: { path: "missing/sub/file.txt", content: "x", create_parents: false } },
     });
     expect((resp.result as { isError: boolean }).isError).toBe(true);
+  }, 15_000);
+
+  test("sub-kilo returns job ID immediately", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "sub-kilo", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    const text = toolText(resp);
+    expect(text).toContain("started (kilo)");
+    expect(text).toContain("get-result");
+  }, 15_000);
+
+  test("get-result retrieves sub-kilo output after completion", async () => {
+    server = startServer();
+    await initializeMcp(server);
+
+    const subResp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "sub-kilo", arguments: { prompt: "hello" } },
+    });
+    const subText = toolText(subResp);
+    const match = subText.match(/Job (\S+) started/);
+    expect(match).toBeTruthy();
+    const jobId = match![1];
+
+    await new Promise((r) => setTimeout(r, 500));
+
+    const resultResp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "get-result", arguments: { job_id: jobId } },
+    });
+    expect(resultResp.error).toBeUndefined();
+    expect(toolText(resultResp)).toContain("Hello from fake kilo: hello");
+  }, 15_000);
+
+  test("get-result unknown job → not found message", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "get-result", arguments: { job_id: "nonexistent" } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect(toolText(resp)).toContain("not found");
   }, 15_000);
 });

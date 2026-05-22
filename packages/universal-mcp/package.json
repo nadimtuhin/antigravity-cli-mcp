@@ -1,6 +1,6 @@
 {
   "name": "universal-ai-cli-mcp",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Universal MCP server — exposes agy, kilo, opencode, codex, and hermes AI CLI tools in a single MCP server",
   "type": "module",
   "bin": {
