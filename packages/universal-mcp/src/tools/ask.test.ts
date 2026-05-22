@@ -147,3 +147,40 @@ describe("buildArgs — agy add_dirs", () => {
     expect(args).not.toContain("--add-dir");
   });
 });
+
+describe("buildArgs — model flags by CLI", () => {
+  test("via=kilo with model → --model flag", () => {
+    const args = buildArgs("hello", "kilo", { model: "claude-sonnet" });
+    expect(args).toContain("--model");
+    expect(args).toContain("claude-sonnet");
+  });
+
+  test("via=opencode with model → --model flag", () => {
+    const args = buildArgs("hello", "opencode", { model: "gpt-4o" });
+    expect(args).toContain("--model");
+    expect(args).toContain("gpt-4o");
+  });
+
+  test("via=codex with model → -c model= flag", () => {
+    const args = buildArgs("hello", "codex", { model: "o3" });
+    expect(args).toContain("-c");
+    expect(args).toContain('model="o3"');
+  });
+
+  test("via=hermes with model → --model flag", () => {
+    const args = buildArgs("hello", "hermes", { model: "MiniMax" });
+    expect(args).toContain("--model");
+    expect(args).toContain("MiniMax");
+  });
+
+  test("via=hermes with max_turns → --max-turns flag", () => {
+    const args = buildArgs("hello", "hermes", { max_turns: 3 });
+    expect(args).toContain("--max-turns");
+    expect(args).toContain("3");
+  });
+
+  test("via=kilo no model → no --model flag", () => {
+    const args = buildArgs("hello", "kilo", {});
+    expect(args).not.toContain("--model");
+  });
+});
