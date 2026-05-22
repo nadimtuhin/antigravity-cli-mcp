@@ -54,6 +54,10 @@ export function buildArgs(prompt: string, via: CliName, opts: Partial<AskInput> 
       if (opts.max_turns !== undefined) args.push("--max-turns", String(opts.max_turns));
       return args;
     }
+    default: {
+      const _: never = via;
+      throw new Error(`unsupported via: ${via}`);
+    }
   }
 }
 
