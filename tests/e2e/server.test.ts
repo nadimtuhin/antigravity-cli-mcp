@@ -175,4 +175,19 @@ describe("e2e: MCP server", () => {
     const result = response.result as { content: Array<{ type: string; text: string }> };
     expect(result.content[0].text).toContain("--dangerously-skip-permissions");
   }, 15_000);
+
+  test("ask-agy passes timeout_ms as --print-timeout flag", async () => {
+    server = startServer();
+    await initializeMcp(server);
+
+    const response = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-agy", arguments: { prompt: "hello", timeout_ms: 5000 } },
+    });
+
+    expect(response.error).toBeUndefined();
+    const result = response.result as { content: Array<{ type: string; text: string }> };
+    expect(result.content[0].text).toContain("--print-timeout");
+    expect(result.content[0].text).toContain("5s");
+  }, 15_000);
 });

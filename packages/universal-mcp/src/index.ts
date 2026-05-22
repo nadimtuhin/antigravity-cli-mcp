@@ -15,7 +15,7 @@ import {
   HERMES_PATH,
 } from "./config.js";
 import { pingHandler } from "./tools/ping.js";
-import { askHandler, type CliName } from "./tools/ask.js";
+import { askHandler, type AskInput as AskHandlerInput, type CliName } from "./tools/ask.js";
 import { usageHandler } from "./tools/usage.js";
 import { makeSubHandler, getResultHandler } from "./tools/subagent.js";
 
@@ -53,7 +53,7 @@ const anthropicModel = z.string().optional().describe("Model override (e.g. 'ant
 const openaiModel = z.string().optional().describe("Model override (e.g. 'o3', 'o4-mini')");
 const maxTurns = z.number().int().min(1).max(200).optional().describe("Max tool-calling iterations");
 
-type AskInput = { prompt: string; cwd?: string; timeout_ms?: number; model?: string; max_turns?: number; add_dirs?: string[]; skip_permissions?: boolean };
+type AskInput = Omit<AskHandlerInput, "via">;
 type McpExtra = Parameters<typeof askHandler>[2];
 
 function makeAskHandler(via: CliName) {
