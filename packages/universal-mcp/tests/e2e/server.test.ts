@@ -221,4 +221,30 @@ describe("e2e: universal MCP server", () => {
     expect(resp.error).toBeUndefined();
     expect(toolText(resp)).toContain("not found");
   }, 15_000);
+
+  test("ask-agy passes cwd as --add-dir flag", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-agy", arguments: { prompt: "hello", cwd: "/tmp" } },
+    });
+    expect(resp.error).toBeUndefined();
+    const out = toolText(resp);
+    expect(out).toContain("--add-dir");
+    expect(out).toContain("/tmp");
+  }, 15_000);
+
+  test("ask-agy passes add_dirs as --add-dir flags", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-agy", arguments: { prompt: "hello", add_dirs: ["/extra/dir"] } },
+    });
+    expect(resp.error).toBeUndefined();
+    const out = toolText(resp);
+    expect(out).toContain("--add-dir");
+    expect(out).toContain("/extra/dir");
+  }, 15_000);
 });

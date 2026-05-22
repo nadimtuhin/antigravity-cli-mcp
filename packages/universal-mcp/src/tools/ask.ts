@@ -12,6 +12,7 @@ export interface AskInput {
   timeout_ms?: number;
   model?: string;
   max_turns?: number;
+  add_dirs?: string[];
   skip_permissions?: boolean;
 }
 
@@ -29,7 +30,10 @@ export function buildArgs(prompt: string, via: CliName, opts: Partial<AskInput> 
   switch (via) {
     case "agy": {
       const args = ["--print", prompt];
-      if (opts.cwd) args.push("--add-dir", opts.cwd);
+      const extraDirs: string[] = opts.cwd ? [opts.cwd] : [];
+      for (const dir of [...new Set([...extraDirs, ...(opts.add_dirs ?? [])])]) {
+        args.push("--add-dir", dir);
+      }
       if (opts.timeout_ms) {
         const seconds = Math.floor(opts.timeout_ms / 1000);
         args.push("--print-timeout", `${seconds}s`);

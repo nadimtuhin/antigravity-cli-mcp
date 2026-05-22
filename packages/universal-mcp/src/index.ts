@@ -43,11 +43,17 @@ const baseAskInput = {
   timeout_ms: z.number().int().min(1000).max(600_000).optional().describe("Timeout in ms"),
 };
 
+const agyAskInput = {
+  ...baseAskInput,
+  add_dirs: z.array(z.string()).max(10).optional().describe("Extra directories to add"),
+  skip_permissions: z.boolean().optional().describe("Skip agy permission prompts"),
+};
+
 const anthropicModel = z.string().optional().describe("Model override (e.g. 'anthropic/claude-sonnet-4', 'anthropic/claude-opus-4-7')");
 const openaiModel = z.string().optional().describe("Model override (e.g. 'o3', 'o4-mini')");
 const maxTurns = z.number().int().min(1).max(200).optional().describe("Max tool-calling iterations");
 
-type AskInput = { prompt: string; cwd?: string; timeout_ms?: number; model?: string; max_turns?: number };
+type AskInput = { prompt: string; cwd?: string; timeout_ms?: number; model?: string; max_turns?: number; add_dirs?: string[]; skip_permissions?: boolean };
 type McpExtra = Parameters<typeof askHandler>[2];
 
 function makeAskHandler(via: CliName) {
@@ -71,7 +77,7 @@ server.registerTool("get-usage", {
 
 server.registerTool("ask-agy", {
   description: "Ask agy (antigravity) a question or run a task. Best for: quick answers, web searches, single-turn Q&A. agy is fast and doesn't use credits.",
-  inputSchema: baseAskInput,
+  inputSchema: agyAskInput,
 }, makeAskHandler("agy"));
 
 server.registerTool("ask-kilo", {
@@ -98,7 +104,7 @@ server.registerTool("ask-hermes", {
 
 server.registerTool("sub-agy", {
   description: "Run agy in the background. Returns a job ID immediately so Claude can do other work in parallel. Call get-result(job_id) to retrieve the output when ready.",
-  inputSchema: baseAskInput,
+  inputSchema: agyAskInput,
 }, makeSubHandler("agy", askConfig));
 
 server.registerTool("sub-kilo", {

@@ -121,3 +121,29 @@ describe("buildArgs — agy timeout and skip_permissions", () => {
     expect(args).not.toContain("--dangerously-skip-permissions");
   });
 });
+
+describe("buildArgs — agy add_dirs", () => {
+  test("via=agy with add_dirs injects --add-dir for each", () => {
+    const args = buildArgs("hello", "agy", { add_dirs: ["/a", "/b"] });
+    expect(args).toContain("--add-dir");
+    expect(args).toContain("/a");
+    expect(args).toContain("/b");
+  });
+
+  test("via=agy deduplicates cwd and add_dirs", () => {
+    const args = buildArgs("hello", "agy", { cwd: "/p", add_dirs: ["/p"] });
+    const count = args.filter((a) => a === "/p").length;
+    expect(count).toBe(1);
+  });
+
+  test("via=agy deduplicates duplicate entries in add_dirs", () => {
+    const args = buildArgs("hello", "agy", { add_dirs: ["/a", "/a"] });
+    const count = args.filter((a) => a === "/a").length;
+    expect(count).toBe(1);
+  });
+
+  test("via=kilo with add_dirs does NOT inject --add-dir", () => {
+    const args = buildArgs("hello", "kilo", { add_dirs: ["/a"] });
+    expect(args).not.toContain("--add-dir");
+  });
+});
