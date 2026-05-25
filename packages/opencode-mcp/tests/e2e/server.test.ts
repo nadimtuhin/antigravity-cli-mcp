@@ -2,6 +2,8 @@ import { describe, test, expect, afterEach } from "bun:test";
 import { startServer, initializeMcp, sendJsonRpc } from "./helpers.js";
 import type { Subprocess } from "bun";
 
+const F = import.meta.dir + "/../../test-fixtures";
+
 let server: Subprocess<"pipe", "pipe", "pipe"> | null = null;
 
 afterEach(() => {
@@ -34,6 +36,36 @@ describe("e2e: opencode-cli-mcp server", () => {
     expect(toolText(resp)).toContain("1.14.18");
   }, 15_000);
 
+  test("ping → missing binary → isError with 'not found'", async () => {
+    server = startServer({ OPENCODE_PATH: "/nonexistent/opencode" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, { method: "tools/call", params: { name: "ping", arguments: {} } });
+    const result = resp.result as { isError: boolean; content: Array<{ text: string }> };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("not found");
+  }, 15_000);
+
+  test("ping → binary exists but fails → isError with 'ping failed'", async () => {
+    server = startServer({ OPENCODE_PATH: "/usr/bin/false" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, { method: "tools/call", params: { name: "ping", arguments: {} } });
+    const result = resp.result as { isError: boolean; content: Array<{ text: string }> };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("ping failed");
+    expect(result.content[0].text).not.toContain("not found");
+  }, 15_000);
+
+  test("invalid OPENCODE_TIMEOUT_MS env var → server starts and responds normally (not NaN/0 timeout)", async () => {
+    server = startServer({ OPENCODE_TIMEOUT_MS: "not-a-number" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-opencode", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect(toolText(resp)).toContain("Hello from fake opencode: hello");
+  }, 15_000);
+
   test("ask-opencode returns fake opencode response", async () => {
     server = startServer();
     await initializeMcp(server);
@@ -45,6 +77,29 @@ describe("e2e: opencode-cli-mcp server", () => {
     expect(toolText(resp)).toContain("Hello from fake opencode: hello");
   }, 15_000);
 
+  test("ask-opencode missing binary → result isError (not JSON-RPC error)", async () => {
+    server = startServer({ OPENCODE_PATH: "/nonexistent/opencode" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-opencode", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    const result = resp.result as { isError: boolean };
+    expect(result.isError).toBe(true);
+  }, 15_000);
+
+  test("invalid OPENCODE_SEARCH_TIMEOUT_MS env var → search-web responds normally (not NaN/0 timeout)", async () => {
+    server = startServer({ OPENCODE_SEARCH_TIMEOUT_MS: "not-a-number" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "search-web", arguments: { query: "bun js" } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect(toolText(resp)).toContain("Search the web for: bun js");
+  }, 15_000);
+
   test("search-web delegates to ask-opencode", async () => {
     server = startServer();
     await initializeMcp(server);
@@ -54,6 +109,17 @@ describe("e2e: opencode-cli-mcp server", () => {
     });
     expect(resp.error).toBeUndefined();
     expect(toolText(resp)).toContain("Search the web for: bun js");
+  }, 15_000);
+
+  test("search-web missing binary → result isError (not JSON-RPC error)", async () => {
+    server = startServer({ OPENCODE_PATH: "/nonexistent/opencode" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "search-web", arguments: { query: "test query" } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect((resp.result as { isError: boolean }).isError).toBe(true);
   }, 15_000);
 
   test("write-file writes to workspace", async () => {
@@ -70,6 +136,18 @@ describe("e2e: opencode-cli-mcp server", () => {
     expect(await Bun.file(`${tmpDir}/hello.txt`).text()).toBe("world");
   }, 15_000);
 
+  test("ask-opencode CLI exits non-zero → isError with stderr preserved", async () => {
+    server = startServer({ OPENCODE_PATH: `${F}/fake-opencode-error.sh` });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-opencode", arguments: { prompt: "hello" } },
+    });
+    const result = resp.result as { isError: boolean; content: Array<{ text: string }> };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("opencode internal failure");
+  }, 15_000);
+
   test("ask-opencode passes model as --model flag", async () => {
     server = startServer();
     await initializeMcp(server);
@@ -81,6 +159,20 @@ describe("e2e: opencode-cli-mcp server", () => {
     const out = toolText(resp);
     expect(out).toContain("--model");
     expect(out).toContain("gpt-4o");
+  }, 15_000);
+
+  test("write-file absolute path outside workspace → isError", async () => {
+    const tmpDir = `/tmp/opencode-mcp-abspath-${Date.now()}`;
+    await Bun.write(`${tmpDir}/.keep`, "");
+    server = startServer({ OPENCODE_WORKSPACE_ROOT: tmpDir });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "write-file", arguments: { path: "/etc/passwd", content: "x", create_parents: false } },
+    });
+    const result = resp.result as { isError: boolean; content: Array<{ text: string }> };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("escapes workspace");
   }, 15_000);
 
   test("write-file path traversal → isError", async () => {
@@ -95,5 +187,31 @@ describe("e2e: opencode-cli-mcp server", () => {
     const result = resp.result as { isError: boolean; content: Array<{ text: string }> };
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("escapes workspace");
+  }, 15_000);
+
+  test("write-file create_parents=true creates parent dirs and writes file", async () => {
+    const tmpDir = `/tmp/opencode-mcp-parents-${Date.now()}`;
+    await Bun.write(`${tmpDir}/.keep`, "");
+    server = startServer({ OPENCODE_WORKSPACE_ROOT: tmpDir });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "write-file", arguments: { path: "new/sub/file.txt", content: "hello", create_parents: true } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect(toolText(resp)).toContain("Written");
+    expect(await Bun.file(`${tmpDir}/new/sub/file.txt`).text()).toBe("hello");
+  }, 15_000);
+
+  test("write-file missing parent dir, create_parents=false → isError", async () => {
+    const tmpDir = `/tmp/opencode-mcp-noparent-${Date.now()}`;
+    await Bun.write(`${tmpDir}/.keep`, "");
+    server = startServer({ OPENCODE_WORKSPACE_ROOT: tmpDir });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "write-file", arguments: { path: "missing/sub/file.txt", content: "x", create_parents: false } },
+    });
+    expect((resp.result as { isError: boolean }).isError).toBe(true);
   }, 15_000);
 });

@@ -54,12 +54,28 @@ describe("askHandler", () => {
     expect(text(result)).toContain("Hello from fake hermes: hello");
   }, 10_000);
 
-  test("missing binary → isError with message", async () => {
+  test("missing binary → isError with 'not found' message", async () => {
     const result = await askHandler(
       { prompt: "hello", via: "kilo" },
       { ...config, paths: { ...config.paths, kilo: "/nonexistent/kilo" } }
     );
     expect(result.isError).toBe(true);
+    expect(text(result)).toContain("not found");
+  }, 10_000);
+
+  test("CLI exits non-zero → isError with stderr preserved (not generic exit code msg)", async () => {
+    const result = await askHandler(
+      { prompt: "hello", via: "kilo" },
+      { ...config, paths: { ...config.paths, kilo: `${F}/fake-kilo-error.sh` } }
+    );
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain("kilo internal failure");
+  }, 10_000);
+
+  test("concurrency limit exceeded → isError with concurrency message", async () => {
+    const result = await askHandler({ prompt: "hello", via: "kilo" }, { ...config, maxConcurrent: 0 });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toMatch(/concurrent/i);
   }, 10_000);
 
   test("timeout → isError with timeout message", async () => {

@@ -26,7 +26,12 @@ export async function writeHandler(input: WriteInput, workspaceRoot: string): Pr
   const parentDir = dirname(resolvedPath);
 
   if (input.create_parents) {
-    await mkdir(parentDir, { recursive: true });
+    try {
+      await mkdir(parentDir, { recursive: true });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return mcpError(`Failed to create directories: ${message}`);
+    }
   } else {
     try {
       await access(parentDir);

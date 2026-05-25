@@ -14,7 +14,7 @@ interface Job {
 const TTL_MS = 10 * 60 * 1000;
 export const jobs = new Map<string, Job>();
 
-function cleanupExpired(): void {
+export function cleanupExpired(): void {
   const now = Date.now();
   for (const [id, job] of jobs) {
     if (job.completedAt !== undefined && now - job.completedAt > TTL_MS) {

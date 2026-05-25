@@ -6,6 +6,40 @@ describe("buildArgs", () => {
     expect(buildArgs("hi", "agy")).toEqual(["--print", "hi"]);
   });
 
+  test("agy: cwd → --add-dir", () => {
+    expect(buildArgs("hi", "agy", { cwd: "/some/dir" })).toEqual([
+      "--print", "hi", "--add-dir", "/some/dir",
+    ]);
+  });
+
+  test("agy: add_dirs → --add-dir for each", () => {
+    expect(buildArgs("hi", "agy", { add_dirs: ["/a", "/b"] })).toEqual([
+      "--print", "hi", "--add-dir", "/a", "--add-dir", "/b",
+    ]);
+  });
+
+  test("agy: cwd + add_dirs deduplicates when cwd already in add_dirs", () => {
+    expect(buildArgs("hi", "agy", { cwd: "/a", add_dirs: ["/a", "/b"] })).toEqual([
+      "--print", "hi", "--add-dir", "/a", "--add-dir", "/b",
+    ]);
+  });
+
+  test("agy: timeout_ms → --print-timeout in seconds", () => {
+    expect(buildArgs("hi", "agy", { timeout_ms: 30_000 })).toEqual([
+      "--print", "hi", "--print-timeout", "30s",
+    ]);
+  });
+
+  test("agy: skip_permissions → --dangerously-skip-permissions", () => {
+    expect(buildArgs("hi", "agy", { skip_permissions: true })).toEqual([
+      "--print", "hi", "--dangerously-skip-permissions",
+    ]);
+  });
+
+  test("agy: skip_permissions=false → no extra flag", () => {
+    expect(buildArgs("hi", "agy", { skip_permissions: false })).toEqual(["--print", "hi"]);
+  });
+
   test("kilo: run subcommand", () => {
     expect(buildArgs("hi", "kilo")).toEqual(["run", "hi"]);
   });

@@ -4,6 +4,7 @@ import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/proto
 import {
   runCli,
   CliTimeoutError,
+  CliExitError,
   mcpText,
   mcpError,
   makeProgressEmitter,
@@ -68,6 +69,10 @@ export async function askHandler(
     return mcpText(result.stdout);
   } catch (e) {
     if (e instanceof CliTimeoutError) return mcpError(`opencode timed out after ${timeoutMs}ms`);
+    if (e instanceof CliExitError) {
+      const out = [e.stdout, e.stderr].filter(Boolean).join("\n").trim();
+      return mcpError(out || `opencode exited with code ${e.exitCode}`);
+    }
     return mcpError(e instanceof Error ? e.message : String(e));
   }
 }

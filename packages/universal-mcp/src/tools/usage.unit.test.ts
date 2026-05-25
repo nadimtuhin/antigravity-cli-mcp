@@ -61,9 +61,24 @@ describe("buildUsageReport", () => {
   });
 
   test("failed hermes → 'Failed to fetch insights'", () => {
-    const out = buildUsageReport(okKilo, okOpencode, { ok: false, output: "timeout" });
+    const out = buildUsageReport(okKilo, okOpencode, { ok: false, output: "connection refused" });
     const hermesSec = out.split("═══ hermes ═══")[1] ?? "";
     expect(hermesSec).toContain("Failed to fetch insights");
+  });
+
+  test("kilo timed out → 'stats timed out' not 'exhausted'", () => {
+    const timedOut: StatsResult = { ok: false, output: "kilo timed out" };
+    const out = buildUsageReport(timedOut, okOpencode, okHermes);
+    const kiloSec = out.split("═══ kilo ═══")[1]?.split("═══")[0] ?? "";
+    expect(kiloSec).toContain("timed out");
+    expect(kiloSec).not.toContain("exhausted");
+  });
+
+  test("hermes timed out → 'insights timed out' not 'Failed to fetch'", () => {
+    const out = buildUsageReport(okKilo, okOpencode, { ok: false, output: "hermes timed out" });
+    const hermesSec = out.split("═══ hermes ═══")[1] ?? "";
+    expect(hermesSec).toContain("timed out");
+    expect(hermesSec).not.toContain("Failed to fetch");
   });
 });
 

@@ -1,7 +1,7 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { ServerNotification, ServerRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
-import { runCli, CliTimeoutError, mcpText, mcpError, makeProgressEmitter } from "mcp-cli-core";
+import { runCli, CliTimeoutError, CliExitError, mcpText, mcpError, makeProgressEmitter } from "mcp-cli-core";
 
 export type CliName = "agy" | "kilo" | "opencode" | "codex" | "hermes";
 
@@ -101,6 +101,10 @@ export async function askHandler(
     return mcpText(result.stdout);
   } catch (e) {
     if (e instanceof CliTimeoutError) return mcpError(`${input.via} timed out after ${timeoutMs}ms`);
+    if (e instanceof CliExitError) {
+      const out = [e.stdout, e.stderr].filter(Boolean).join("\n").trim();
+      return mcpError(out || `${input.via} exited with code ${e.exitCode}`);
+    }
     return mcpError(e instanceof Error ? e.message : String(e));
   }
 }

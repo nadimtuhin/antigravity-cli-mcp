@@ -1,5 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { runCli, mcpText } from "mcp-cli-core";
+import { runCli, mcpText, CliNotFoundError, CliTimeoutError, CliExitError } from "mcp-cli-core";
 
 interface CliSpec {
   name: string;
@@ -15,8 +15,14 @@ async function checkCli(spec: CliSpec): Promise<string> {
       maxConcurrent: 10,
     });
     return `✓ ${spec.name}: ${result.stdout.trim().split("\n")[0]}`;
-  } catch {
-    return `✗ ${spec.name}: not found (${spec.path})`;
+  } catch (e) {
+    if (e instanceof CliNotFoundError) return `✗ ${spec.name}: not found (${spec.path})`;
+    if (e instanceof CliTimeoutError) return `✗ ${spec.name}: timed out`;
+    if (e instanceof CliExitError) {
+      const out = [e.stdout, e.stderr].filter(Boolean).join(" ").trim();
+      return `✗ ${spec.name}: check failed${out ? ` — ${out}` : ""}`;
+    }
+    return `✗ ${spec.name}: check failed`;
   }
 }
 

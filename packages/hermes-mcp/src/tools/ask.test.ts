@@ -24,24 +24,42 @@ describe("askHandler (hermes)", () => {
     expect(text(result)).toContain("Hello from fake hermes: hello");
   }, 10_000);
 
-  test("with model → succeeds", async () => {
+  test("with model → --model flag in CLI args", async () => {
     const result = await askHandler({ prompt: "hello", model: "MiniMax" }, config);
     expect(result.isError).toBeUndefined();
-    expect(text(result)).toContain("Hello from fake hermes: hello");
+    expect(text(result)).toContain("--model");
+    expect(text(result)).toContain("MiniMax");
   }, 10_000);
 
-  test("with max_turns → succeeds", async () => {
+  test("with max_turns → --max-turns flag in CLI args", async () => {
     const result = await askHandler({ prompt: "hello", max_turns: 5 }, config);
     expect(result.isError).toBeUndefined();
-    expect(text(result)).toContain("Hello from fake hermes: hello");
+    expect(text(result)).toContain("--max-turns");
+    expect(text(result)).toContain("5");
   }, 10_000);
 
-  test("missing binary → isError", async () => {
+  test("missing binary → isError with 'not found' message", async () => {
     const result = await askHandler(
       { prompt: "hello" },
       { ...config, cliCmdPath: "/nonexistent/hermes" }
     );
     expect(result.isError).toBe(true);
+    expect(text(result)).toContain("not found");
+  }, 10_000);
+
+  test("CLI exits non-zero → isError with stderr preserved", async () => {
+    const result = await askHandler(
+      { prompt: "hello" },
+      { ...config, cliCmdPath: `${F}/fake-hermes-error.sh` }
+    );
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain("hermes internal failure");
+  }, 10_000);
+
+  test("concurrency limit exceeded → isError with concurrency message", async () => {
+    const result = await askHandler({ prompt: "hello" }, { ...config, maxConcurrent: 0 });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toMatch(/concurrent/i);
   }, 10_000);
 
   test("timeout → isError with timed out message", async () => {

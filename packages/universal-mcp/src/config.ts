@@ -1,7 +1,7 @@
-export const TIMEOUT_MS = Number(process.env.AI_CLI_TIMEOUT_MS ?? 300_000);
-export const SEARCH_TIMEOUT_MS = Number(process.env.AI_CLI_SEARCH_TIMEOUT_MS ?? 60_000);
+export const TIMEOUT_MS = Number(process.env.AI_CLI_TIMEOUT_MS) || 300_000;
+export const SEARCH_TIMEOUT_MS = Number(process.env.AI_CLI_SEARCH_TIMEOUT_MS) || 60_000;
 export const WORKSPACE_ROOT = process.env.AI_CLI_WORKSPACE_ROOT ?? process.cwd();
-export const MAX_CONCURRENT = Number(process.env.AI_CLI_MAX_CONCURRENT ?? 3);
+export const MAX_CONCURRENT = Number(process.env.AI_CLI_MAX_CONCURRENT) || 3;
 export const DEBUG = process.env.AI_CLI_DEBUG === "1";
 
 export const AGY_PATH = process.env.AGY_PATH ?? "/Users/nadimtuhin/.local/bin/agy";

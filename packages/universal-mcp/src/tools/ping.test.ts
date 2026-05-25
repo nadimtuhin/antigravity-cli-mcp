@@ -60,6 +60,35 @@ describe("pingHandler", () => {
     expect(out).toContain("✗ hermes");
   }, 10_000);
 
+  test("binary exists but version exits non-zero → 'check failed' not 'not found'", async () => {
+    const result = await pingHandler({
+      agy: "/usr/bin/false",
+      kilo: `${F}/fake-kilo.sh`,
+      opencode: `${F}/fake-opencode.sh`,
+      codex: `${F}/fake-codex.sh`,
+      hermes: `${F}/fake-hermes.sh`,
+      workspaceRoot: "/tmp",
+    });
+    const out = text(result);
+    expect(out).toContain("✗ agy");
+    expect(out).not.toContain("not found");
+    expect(out).toContain("check failed");
+  }, 10_000);
+
+  test("version exits non-zero with stderr → check failed includes stderr output", async () => {
+    const result = await pingHandler({
+      agy: `${F}/fake-agy.sh`,
+      kilo: `${F}/fake-kilo-version-error.sh`,
+      opencode: `${F}/fake-opencode.sh`,
+      codex: `${F}/fake-codex.sh`,
+      hermes: `${F}/fake-hermes.sh`,
+      workspaceRoot: "/tmp",
+    });
+    const out = text(result);
+    expect(out).toContain("✗ kilo");
+    expect(out).toContain("kilo version check failed");
+  }, 10_000);
+
   test("includes workspace root", async () => {
     const result = await pingHandler({
       agy: `${F}/fake-agy.sh`,

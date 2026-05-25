@@ -23,6 +23,16 @@ describe("runCli", () => {
     expect((err as CliExitError).exitCode).toBe(42);
   }, 10_000);
 
+  test("non-zero exit with output: CliExitError carries stdout and stderr", async () => {
+    const err = await runCli(
+      ["-c", "echo 'out line'; echo 'err line' >&2; exit 1"],
+      { cliCmdPath: "/bin/sh" }
+    ).catch((e) => e);
+    expect(err).toBeInstanceOf(CliExitError);
+    expect((err as CliExitError).stdout).toContain("out line");
+    expect((err as CliExitError).stderr).toContain("err line");
+  }, 10_000);
+
   test("timeout: throws CliTimeoutError", async () => {
     await expect(
       runCli(["-c", "sleep 5"], { cliCmdPath: "/bin/sh", timeoutMs: 100 })

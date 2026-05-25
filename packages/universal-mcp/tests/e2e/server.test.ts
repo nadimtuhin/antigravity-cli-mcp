@@ -42,6 +42,30 @@ describe("e2e: universal MCP server", () => {
     expect(names).toContain("get-usage");
   }, 15_000);
 
+  test("ask-agy with timeout_ms below minimum → isError with validation message", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-agy", arguments: { prompt: "hello", timeout_ms: 500 } },
+    });
+    const result = resp.result as { isError: boolean; content: Array<{ text: string }> };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("Invalid");
+  }, 15_000);
+
+  test("ask-agy with missing prompt → isError with validation message", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-agy", arguments: {} },
+    });
+    const result = resp.result as { isError: boolean; content: Array<{ text: string }> };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("Invalid");
+  }, 15_000);
+
   test("ping → all 5 CLIs detected", async () => {
     server = startServer();
     await initializeMcp(server);
@@ -53,6 +77,28 @@ describe("e2e: universal MCP server", () => {
     expect(out).toContain("✓ opencode");
     expect(out).toContain("✓ codex");
     expect(out).toContain("✓ hermes");
+  }, 15_000);
+
+  test("ping → binary exists but version exits non-zero → 'check failed' not 'not found'", async () => {
+    server = startServer({ AGY_PATH: "/usr/bin/false" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, { method: "tools/call", params: { name: "ping", arguments: {} } });
+    expect(resp.error).toBeUndefined();
+    const out = toolText(resp);
+    expect(out).toContain("✗ agy");
+    expect(out).toContain("check failed");
+    expect(out).not.toContain("✗ agy: not found");
+  }, 15_000);
+
+  test("invalid AI_CLI_TIMEOUT_MS env var → server starts and responds normally (not NaN/0 timeout)", async () => {
+    server = startServer({ AI_CLI_TIMEOUT_MS: "not-a-number" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-agy", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect(toolText(resp)).toContain("Hello from fake agy: hello");
   }, 15_000);
 
   test("ask-agy returns fake agy response", async () => {
@@ -110,6 +156,17 @@ describe("e2e: universal MCP server", () => {
     expect(toolText(resp)).toContain("Search the web for: bun js");
   }, 15_000);
 
+  test("search-web missing binary → result isError (not JSON-RPC error)", async () => {
+    server = startServer({ AGY_PATH: "/nonexistent/agy" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "search-web", arguments: { query: "test query" } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect((resp.result as { isError: boolean }).isError).toBe(true);
+  }, 15_000);
+
   test("get-usage → agy and codex show no-tracking, kilo shows free tier warning", async () => {
     server = startServer();
     await initializeMcp(server);
@@ -122,6 +179,19 @@ describe("e2e: universal MCP server", () => {
     expect(out).toContain("No balance tracking");
     expect(out).toContain("Free tier detected");
     expect(out).toContain("Total tokens");
+  }, 15_000);
+
+  test("get-usage with missing kilo binary → shows 'not installed', not 'exhausted'", async () => {
+    server = startServer({ KILO_PATH: "/nonexistent/kilo" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "get-usage", arguments: {} },
+    });
+    expect(resp.error).toBeUndefined();
+    const out = toolText(resp);
+    expect(out).toContain("not installed");
+    expect(out).not.toContain("exhausted");
   }, 15_000);
 
   test("get-usage with exhausted kilo → shows exhausted error", async () => {
@@ -147,6 +217,20 @@ describe("e2e: universal MCP server", () => {
     expect(resp.error).toBeUndefined();
     expect(toolText(resp)).toContain("Written");
     expect(await Bun.file(`${tmpDir}/hello.txt`).text()).toBe("world");
+  }, 15_000);
+
+  test("write-file absolute path outside workspace → isError", async () => {
+    const tmpDir = `/tmp/universal-mcp-abspath-${Date.now()}`;
+    await Bun.write(`${tmpDir}/.keep`, "");
+    server = startServer({ AI_CLI_WORKSPACE_ROOT: tmpDir });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "write-file", arguments: { path: "/etc/passwd", content: "x", create_parents: false } },
+    });
+    const result = resp.result as { isError: boolean; content: Array<{ text: string }> };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("escapes workspace");
   }, 15_000);
 
   test("write-file path traversal → isError", async () => {
@@ -211,6 +295,96 @@ describe("e2e: universal MCP server", () => {
     expect(toolText(resultResp)).toContain("Hello from fake kilo: hello");
   }, 15_000);
 
+
+  test("get-result called twice on completed job → second call returns 'not found'", async () => {
+    server = startServer();
+    await initializeMcp(server);
+
+    const subResp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "sub-kilo", arguments: { prompt: "hello" } },
+    });
+    const match = toolText(subResp).match(/Job (\S+) started/);
+    expect(match).toBeTruthy();
+    const jobId = match![1];
+
+    await new Promise((r) => setTimeout(r, 500));
+
+    const first = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "get-result", arguments: { job_id: jobId } },
+    });
+    expect(toolText(first)).toContain("Hello from fake kilo");
+
+    const second = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "get-result", arguments: { job_id: jobId } },
+    });
+    expect(toolText(second)).toContain("not found");
+  }, 15_000);
+
+  test("sub-codex returns job ID immediately", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "sub-codex", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    const text = toolText(resp);
+    expect(text).toContain("started (codex)");
+    expect(text).toContain("get-result");
+  }, 15_000);
+
+  test("sub-hermes returns job ID immediately", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "sub-hermes", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    const text = toolText(resp);
+    expect(text).toContain("started (hermes)");
+    expect(text).toContain("get-result");
+  }, 15_000);
+
+  test("sub-opencode returns job ID immediately", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "sub-opencode", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    const text = toolText(resp);
+    expect(text).toContain("started (opencode)");
+    expect(text).toContain("get-result");
+  }, 15_000);
+
+  test("sub-kilo passes model to background job output", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const subResp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "sub-kilo", arguments: { prompt: "hello", model: "claude-opus" } },
+    });
+    const subText = toolText(subResp);
+    const match = subText.match(/Job (\S+) started/);
+    expect(match).toBeTruthy();
+    const jobId = match![1];
+
+    await new Promise((r) => setTimeout(r, 500));
+
+    const resultResp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "get-result", arguments: { job_id: jobId } },
+    });
+    expect(resultResp.error).toBeUndefined();
+    const out = toolText(resultResp);
+    expect(out).toContain("--model");
+    expect(out).toContain("claude-opus");
+  }, 15_000);
 
   test("ask-kilo passes model as --model flag", async () => {
     server = startServer();
@@ -418,6 +592,28 @@ describe("e2e: universal MCP server", () => {
     expect(out).toContain("failed");
   }, 15_000);
 
+  test("sub-kilo with missing binary → job status is error, not done", async () => {
+    server = startServer({ KILO_PATH: "/nonexistent/kilo" });
+    await initializeMcp(server);
+    const subResp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "sub-kilo", arguments: { prompt: "hello" } },
+    });
+    const subText = toolText(subResp);
+    const match = subText.match(/Job (\S+) started/);
+    expect(match).toBeTruthy();
+    const jobId = match![1];
+
+    await new Promise((r) => setTimeout(r, 500));
+
+    const resultResp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "get-result", arguments: { job_id: jobId } },
+    });
+    expect(resultResp.error).toBeUndefined();
+    expect(toolText(resultResp)).toContain("failed");
+  }, 15_000);
+
   test("ask-agy passes cwd as --add-dir flag", async () => {
     server = startServer();
     await initializeMcp(server);
@@ -442,5 +638,98 @@ describe("e2e: universal MCP server", () => {
     const out = toolText(resp);
     expect(out).toContain("--add-dir");
     expect(out).toContain("/extra/dir");
+  }, 15_000);
+
+  test("ask-agy passes skip_permissions as --dangerously-skip-permissions flag", async () => {
+    server = startServer();
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-agy", arguments: { prompt: "hello", skip_permissions: true } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect(toolText(resp)).toContain("--dangerously-skip-permissions");
+  }, 15_000);
+
+  test("write-file create_parents=true creates parent dirs and writes file", async () => {
+    const tmpDir = `/tmp/universal-mcp-parents-${Date.now()}`;
+    await Bun.write(`${tmpDir}/.keep`, "");
+    server = startServer({ AI_CLI_WORKSPACE_ROOT: tmpDir });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "write-file", arguments: { path: "new/sub/file.txt", content: "hello", create_parents: true } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect(toolText(resp)).toContain("Written");
+    expect(await Bun.file(`${tmpDir}/new/sub/file.txt`).text()).toBe("hello");
+  }, 15_000);
+
+  test("ask-agy missing binary → result isError (not JSON-RPC error)", async () => {
+    server = startServer({ AGY_PATH: "/nonexistent/agy" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-agy", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect((resp.result as { isError: boolean }).isError).toBe(true);
+  }, 15_000);
+
+  test("ask-kilo missing binary → result isError (not JSON-RPC error)", async () => {
+    server = startServer({ KILO_PATH: "/nonexistent/kilo" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-kilo", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect((resp.result as { isError: boolean }).isError).toBe(true);
+  }, 15_000);
+
+  test("ask-codex missing binary → result isError (not JSON-RPC error)", async () => {
+    server = startServer({ CODEX_PATH: "/nonexistent/codex" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-codex", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect((resp.result as { isError: boolean }).isError).toBe(true);
+  }, 15_000);
+
+  test("ask-hermes missing binary → result isError (not JSON-RPC error)", async () => {
+    server = startServer({ HERMES_PATH: "/nonexistent/hermes" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-hermes", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect((resp.result as { isError: boolean }).isError).toBe(true);
+  }, 15_000);
+
+  test("ask-opencode missing binary → result isError (not JSON-RPC error)", async () => {
+    server = startServer({ OPENCODE_PATH: "/nonexistent/opencode" });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-opencode", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    expect((resp.result as { isError: boolean }).isError).toBe(true);
+  }, 15_000);
+
+  test("ask-kilo CLI exits non-zero → isError with stderr preserved, not generic 'exited with code'", async () => {
+    server = startServer({ KILO_PATH: `${F}/fake-kilo-error.sh` });
+    await initializeMcp(server);
+    const resp = await sendJsonRpc(server, {
+      method: "tools/call",
+      params: { name: "ask-kilo", arguments: { prompt: "hello" } },
+    });
+    expect(resp.error).toBeUndefined();
+    const result = resp.result as { isError: boolean; content: Array<{ text: string }> };
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("kilo internal failure");
   }, 15_000);
 });

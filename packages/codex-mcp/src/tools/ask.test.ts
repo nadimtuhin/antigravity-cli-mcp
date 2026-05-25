@@ -24,18 +24,35 @@ describe("askHandler (codex)", () => {
     expect(text(result)).toContain("Hello from fake codex: hello");
   }, 10_000);
 
-  test("with model → succeeds (model passed via -c flag)", async () => {
+  test("with model → -c model= flag in CLI args", async () => {
     const result = await askHandler({ prompt: "hello", model: "o3" }, config);
     expect(result.isError).toBeUndefined();
-    expect(text(result)).toContain("Hello from fake codex: hello");
+    expect(text(result)).toContain("-c");
+    expect(text(result)).toContain('model="o3"');
   }, 10_000);
 
-  test("missing binary → isError", async () => {
+  test("missing binary → isError with 'not found' message", async () => {
     const result = await askHandler(
       { prompt: "hello" },
       { ...config, cliCmdPath: "/nonexistent/codex" }
     );
     expect(result.isError).toBe(true);
+    expect(text(result)).toContain("not found");
+  }, 10_000);
+
+  test("CLI exits non-zero → isError with stderr preserved", async () => {
+    const result = await askHandler(
+      { prompt: "hello" },
+      { ...config, cliCmdPath: `${F}/fake-codex-error.sh` }
+    );
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain("codex internal failure");
+  }, 10_000);
+
+  test("concurrency limit exceeded → isError with concurrency message", async () => {
+    const result = await askHandler({ prompt: "hello" }, { ...config, maxConcurrent: 0 });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toMatch(/concurrent/i);
   }, 10_000);
 
   test("timeout → isError with timed out message", async () => {

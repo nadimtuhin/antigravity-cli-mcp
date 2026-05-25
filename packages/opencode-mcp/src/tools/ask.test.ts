@@ -24,18 +24,35 @@ describe("askHandler (opencode)", () => {
     expect(text(result)).toContain("Hello from fake opencode: hello");
   }, 10_000);
 
-  test("with model → succeeds", async () => {
+  test("with model → --model flag in CLI args", async () => {
     const result = await askHandler({ prompt: "hello", model: "gpt-4o" }, config);
     expect(result.isError).toBeUndefined();
-    expect(text(result)).toContain("Hello from fake opencode: hello");
+    expect(text(result)).toContain("--model");
+    expect(text(result)).toContain("gpt-4o");
   }, 10_000);
 
-  test("missing binary → isError", async () => {
+  test("missing binary → isError with 'not found' message", async () => {
     const result = await askHandler(
       { prompt: "hello" },
       { ...config, cliCmdPath: "/nonexistent/opencode" }
     );
     expect(result.isError).toBe(true);
+    expect(text(result)).toContain("not found");
+  }, 10_000);
+
+  test("CLI exits non-zero → isError with stderr preserved", async () => {
+    const result = await askHandler(
+      { prompt: "hello" },
+      { ...config, cliCmdPath: `${F}/fake-opencode-error.sh` }
+    );
+    expect(result.isError).toBe(true);
+    expect(text(result)).toContain("opencode internal failure");
+  }, 10_000);
+
+  test("concurrency limit exceeded → isError with concurrency message", async () => {
+    const result = await askHandler({ prompt: "hello" }, { ...config, maxConcurrent: 0 });
+    expect(result.isError).toBe(true);
+    expect(text(result)).toMatch(/concurrent/i);
   }, 10_000);
 
   test("timeout → isError with timed out message", async () => {

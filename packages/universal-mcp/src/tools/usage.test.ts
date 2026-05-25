@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
-import { usageHandler } from "./usage.js";
+import { usageHandler, fetchStats } from "./usage.js";
+import { CliTimeoutError } from "mcp-cli-core";
 
 const F = import.meta.dir + "/../../test-fixtures";
 
@@ -65,17 +66,27 @@ describe("usageHandler", () => {
     expect(out).toContain("Free token limit likely exhausted");
   }, 10_000);
 
-  test("missing binary → exhausted error in that section, no free tier warning for it", async () => {
+  test("missing binary → 'not installed' message, not 'exhausted', no free tier warning", async () => {
     const result = await usageHandler({
       ...FAKES,
       opencode: "/nonexistent/opencode",
     });
     const out = text(result);
-    // extract opencode section only
     const opencodeSection = out.split("═══ opencode ═══")[1]?.split("═══")[0] ?? "";
-    expect(opencodeSection).toContain("Free token limit likely exhausted");
+    expect(opencodeSection).toContain("not installed");
+    expect(opencodeSection).not.toContain("exhausted");
     expect(opencodeSection).not.toContain("Free tier detected");
   }, 10_000);
+
+  test("CLI stats times out → 'timed out' message not 'exhausted'", async () => {
+    const timeoutRunner = async () => {
+      throw new CliTimeoutError("CLI timed out after 10000ms", "", "");
+    };
+    const result = await fetchStats("kilo", "/path/to/kilo", ["stats"], timeoutRunner);
+    expect(result.ok).toBe(false);
+    expect(result.output).toContain("timed out");
+    expect(result.output).not.toContain("exhausted");
+  });
 
   test("result is never isError — always returns text", async () => {
     const result = await usageHandler({
