@@ -7,6 +7,8 @@ import {
   AGY_SEARCH_TIMEOUT_MS,
   AGY_WORKSPACE_ROOT,
   AGY_MAX_CONCURRENT,
+  AGY_MAX_OUTPUT_BYTES,
+  AGY_DEBUG,
 } from "./config.js";
 import { pingHandler } from "./tools/ping.js";
 import { askHandler } from "./tools/ask.js";
@@ -20,6 +22,8 @@ const askConfig = {
   timeoutMs: AGY_TIMEOUT_MS,
   workspaceRoot: AGY_WORKSPACE_ROOT,
   maxConcurrent: AGY_MAX_CONCURRENT,
+  maxOutputBytes: AGY_MAX_OUTPUT_BYTES,
+  debug: AGY_DEBUG,
 };
 
 server.registerTool(
@@ -74,6 +78,8 @@ server.registerTool(
         searchTimeoutMs: AGY_SEARCH_TIMEOUT_MS,
         workspaceRoot: AGY_WORKSPACE_ROOT,
         maxConcurrent: AGY_MAX_CONCURRENT,
+        maxOutputBytes: AGY_MAX_OUTPUT_BYTES,
+        debug: AGY_DEBUG,
       },
       extra
     )

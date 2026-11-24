@@ -13,7 +13,7 @@
   ],
   "scripts": {
     "dev": "bun run --watch src/index.ts",
-    "build": "bun build src/index.ts --target bun --outfile dist/index.js",
+    "build": "bun build src/index.ts --target bun --outfile dist/index.js --banner \"#!/usr/bin/env bun\"",
     "start": "bun run dist/index.js",
     "test": "bun test",
     "test:watch": "bun test --watch",

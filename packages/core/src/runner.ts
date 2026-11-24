@@ -36,6 +36,18 @@ export async function runCli(args: string[], opts: RunCliOpts): Promise<RunCliRe
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
   let killHandle: ReturnType<typeof setTimeout> | null = null;
 
+  // The child runs in its own process group so a kill reaches any processes it
+  // forked (e.g. a shell wrapper's children), which would otherwise keep the
+  // stdout/stderr pipes open and block the drain below indefinitely.
+  function killGroup(signal: NodeJS.Signals): void {
+    if (!proc) return;
+    try {
+      process.kill(-proc.pid, signal);
+    } catch {
+      try { proc.kill(signal); } catch {}
+    }
+  }
+
   try {
     try {
       proc = Bun.spawn({
@@ -44,6 +56,7 @@ export async function runCli(args: string[], opts: RunCliOpts): Promise<RunCliRe
         stdout: "pipe",
         stderr: "pipe",
         cwd: opts.cwd,
+        detached: true,
       });
     } catch (e: unknown) {
       const err = e as { code?: string };
@@ -56,10 +69,8 @@ export async function runCli(args: string[], opts: RunCliOpts): Promise<RunCliRe
     if (opts.timeoutMs !== undefined) {
       timeoutHandle = setTimeout(() => {
         timedOut = true;
-        try { proc!.kill("SIGTERM"); } catch {}
-        killHandle = setTimeout(() => {
-          try { proc!.kill("SIGKILL"); } catch {}
-        }, 5_000);
+        killGroup("SIGTERM");
+        killHandle = setTimeout(() => killGroup("SIGKILL"), 5_000);
       }, opts.timeoutMs);
     }
 
@@ -97,7 +108,7 @@ export async function runCli(args: string[], opts: RunCliOpts): Promise<RunCliRe
               }
             }
             capped = true;
-            try { proc!.kill("SIGTERM"); } catch {}
+            killGroup("SIGTERM");
           }
         }
       }
