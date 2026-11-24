@@ -96,4 +96,9 @@ describe("askHandler", () => {
     expect(first.method).toBe("notifications/progress");
     expect(first.params.progressToken).toBe("tok-1");
   });
+
+  test("caps output at config.maxOutputBytes", async () => {
+    const result = await askHandler({ prompt: "hello" }, { ...FAKE_CONFIG, maxOutputBytes: 10 });
+    expect(getTextContent(result).length).toBeLessThanOrEqual(10);
+  });
 });

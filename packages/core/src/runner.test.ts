@@ -77,4 +77,28 @@ describe("runCli", () => {
       runCli(["-c", "yes"], { cliCmdPath: "/bin/sh", maxOutputBytes: 50 })
     ).resolves.toMatchObject({ stdout: expect.any(String) });
   }, 10_000);
+
+  test("timeout: kills grandchild processes so the call returns promptly", async () => {
+    // The trailing `; true` stops sh from exec-ing sleep, so sleep is a grandchild
+    // that holds the stdout pipe open. Killing only sh left the read hanging for 30s.
+    const started = Date.now();
+    await expect(
+      runCli(["-c", "sleep 30; true"], { cliCmdPath: "/bin/sh", timeoutMs: 200 })
+    ).rejects.toBeInstanceOf(CliTimeoutError);
+    expect(Date.now() - started).toBeLessThan(3_000);
+  }, 10_000);
+
+  test("maxOutputBytes: escalates to SIGKILL when the child ignores SIGTERM", async () => {
+    // No timeoutMs: the output cap is the only thing that can stop this child.
+    // It ignores SIGTERM and writes forever, so without a SIGKILL follow-up the
+    // drain never sees EOF and runCli never settles.
+    const started = Date.now();
+    const result = await runCli(
+      ["-c", "trap '' TERM; while :; do echo 1234567890; done"],
+      { cliCmdPath: "/bin/sh", maxOutputBytes: 100 }
+    );
+    expect(result.stdout.length).toBeLessThanOrEqual(100);
+    expect(result.timedOut).toBe(false);
+    expect(Date.now() - started).toBeLessThan(10_000);
+  }, 15_000);
 });

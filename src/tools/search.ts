@@ -10,6 +10,8 @@ interface SearchConfig {
   searchTimeoutMs: number;
   workspaceRoot: string;
   maxConcurrent: number;
+  maxOutputBytes?: number;
+  debug?: boolean;
 }
 
 export async function searchHandler(
@@ -25,6 +27,8 @@ export async function searchHandler(
       timeoutMs: config.searchTimeoutMs,
       workspaceRoot: config.workspaceRoot,
       maxConcurrent: config.maxConcurrent,
+      maxOutputBytes: config.maxOutputBytes,
+      debug: config.debug,
     },
     extra
   );

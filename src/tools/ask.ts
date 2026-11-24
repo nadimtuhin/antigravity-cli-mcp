@@ -16,6 +16,8 @@ interface AskConfig {
   timeoutMs: number;
   workspaceRoot: string;
   maxConcurrent: number;
+  maxOutputBytes?: number;
+  debug?: boolean;
 }
 
 export type McpExtra = RequestHandlerExtra<ServerRequest, ServerNotification>;
@@ -65,6 +67,9 @@ export async function askHandler(
       cwd: input.cwd ?? config.workspaceRoot,
       timeoutMs,
       maxConcurrent: config.maxConcurrent,
+      maxOutputBytes: config.maxOutputBytes,
+      debug: config.debug,
+      debugPrefix: "[agy]",
       onChunk,
     });
     return mcpText(result.stdout);
