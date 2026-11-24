@@ -19,6 +19,9 @@ export interface RunCliOpts {
 
 let activeCount = 0;
 
+// How long a SIGTERM'd process group gets to exit before it is SIGKILLed.
+const KILL_GRACE_MS = 5_000;
+
 export async function runCli(args: string[], opts: RunCliOpts): Promise<RunCliResult> {
   const limit = opts.maxConcurrent ?? 3;
   const maxBytes = opts.maxOutputBytes ?? 1_000_000;
@@ -48,6 +51,15 @@ export async function runCli(args: string[], opts: RunCliOpts): Promise<RunCliRe
     }
   }
 
+  // SIGTERM the group, then SIGKILL it if it is still around after the grace
+  // period, so a child that ignores SIGTERM cannot keep the drain hung forever.
+  function terminateGroup(): void {
+    killGroup("SIGTERM");
+    if (killHandle === null) {
+      killHandle = setTimeout(() => killGroup("SIGKILL"), KILL_GRACE_MS);
+    }
+  }
+
   try {
     try {
       proc = Bun.spawn({
@@ -69,8 +81,7 @@ export async function runCli(args: string[], opts: RunCliOpts): Promise<RunCliRe
     if (opts.timeoutMs !== undefined) {
       timeoutHandle = setTimeout(() => {
         timedOut = true;
-        killGroup("SIGTERM");
-        killHandle = setTimeout(() => killGroup("SIGKILL"), 5_000);
+        terminateGroup();
       }, opts.timeoutMs);
     }
 
@@ -108,7 +119,7 @@ export async function runCli(args: string[], opts: RunCliOpts): Promise<RunCliRe
               }
             }
             capped = true;
-            killGroup("SIGTERM");
+            terminateGroup();
           }
         }
       }

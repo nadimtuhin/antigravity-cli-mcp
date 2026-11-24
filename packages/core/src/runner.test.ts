@@ -87,4 +87,18 @@ describe("runCli", () => {
     ).rejects.toBeInstanceOf(CliTimeoutError);
     expect(Date.now() - started).toBeLessThan(3_000);
   }, 10_000);
+
+  test("maxOutputBytes: escalates to SIGKILL when the child ignores SIGTERM", async () => {
+    // No timeoutMs: the output cap is the only thing that can stop this child.
+    // It ignores SIGTERM and writes forever, so without a SIGKILL follow-up the
+    // drain never sees EOF and runCli never settles.
+    const started = Date.now();
+    const result = await runCli(
+      ["-c", "trap '' TERM; while :; do echo 1234567890; done"],
+      { cliCmdPath: "/bin/sh", maxOutputBytes: 100 }
+    );
+    expect(result.stdout.length).toBeLessThanOrEqual(100);
+    expect(result.timedOut).toBe(false);
+    expect(Date.now() - started).toBeLessThan(10_000);
+  }, 15_000);
 });
